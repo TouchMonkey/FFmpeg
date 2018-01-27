@@ -31,6 +31,11 @@ VSPixelFormat ff_av2vs_pixfmt(AVFilterContext *ctx, enum AVPixelFormat pf)
     case AV_PIX_FMT_YUV411P:  return PF_YUV411P;
     case AV_PIX_FMT_YUV440P:  return PF_YUV440P;
     case AV_PIX_FMT_YUVA420P: return PF_YUVA420P;
+    case AV_PIX_FMT_YUVJ444P: return PF_YUV444P;
+    case AV_PIX_FMT_YUVJ422P: return PF_YUV422P;
+    case AV_PIX_FMT_YUVJ420P: return PF_YUV420P;
+    case AV_PIX_FMT_YUVJ411P: return PF_YUV411P;
+    case AV_PIX_FMT_YUVJ440P: return PF_YUV440P;
     case AV_PIX_FMT_GRAY8:    return PF_GRAY8;
     case AV_PIX_FMT_RGB24:    return PF_RGB24;
     case AV_PIX_FMT_BGR24:    return PF_BGR24;
