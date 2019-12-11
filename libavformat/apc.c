@@ -25,7 +25,7 @@
 #include "avformat.h"
 #include "internal.h"
 
-static int apc_probe(AVProbeData *p)
+static int apc_probe(const AVProbeData *p)
 {
     if (!strncmp(p->buf, "CRYO_APC", 8))
         return AVPROBE_SCORE_MAX;
@@ -78,7 +78,6 @@ static int apc_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     if (av_get_packet(s->pb, pkt, MAX_READ_SIZE) <= 0)
         return AVERROR(EIO);
-    pkt->flags &= ~AV_PKT_FLAG_CORRUPT;
     pkt->stream_index = 0;
     return 0;
 }

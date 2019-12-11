@@ -30,6 +30,7 @@
 #include "libavutil/channel_layout.h"
 #include "libavutil/float_dsp.h"
 #include "libavutil/mem.h"
+#include "libavutil/thread.h"
 #include "avcodec.h"
 #include "internal.h"
 #include "get_bits.h"
@@ -310,7 +311,7 @@ static av_cold int decode_vbmtree(GetBitContext *gb, int8_t vbm_tree[25])
     return 0;
 }
 
-static av_cold void wmavoice_init_static_data(AVCodec *codec)
+static av_cold void wmavoice_init_static_data(void)
 {
     static const uint8_t bits[] = {
          2,  2,  2,  4,  4,  4,
@@ -365,8 +366,11 @@ static av_cold void wmavoice_flush(AVCodecContext *ctx)
  */
 static av_cold int wmavoice_decode_init(AVCodecContext *ctx)
 {
+    static AVOnce init_static_once = AV_ONCE_INIT;
     int n, flags, pitch_range, lsp16_flag;
     WMAVoiceContext *s = ctx->priv_data;
+
+    ff_thread_once(&init_static_once, wmavoice_init_static_data);
 
     /**
      * Extradata layout:
@@ -428,6 +432,9 @@ static av_cold int wmavoice_decode_init(AVCodecContext *ctx)
         av_log(ctx, AV_LOG_ERROR, "Invalid VBM tree; broken extradata?\n");
         return AVERROR_INVALIDDATA;
     }
+
+    if (ctx->sample_rate >= INT_MAX / (256 * 37))
+        return AVERROR_INVALIDDATA;
 
     s->min_pitch_val    = ((ctx->sample_rate << 8)      /  400 + 50) >> 8;
     s->max_pitch_val    = ((ctx->sample_rate << 8) * 37 / 2000 + 50) >> 8;
@@ -1516,7 +1523,7 @@ static int synth_frame(AVCodecContext *ctx, GetBitContext *gb, int frame_idx,
 
         /* "pitch-diff-per-sample" for calculation of pitch per sample */
         s->pitch_diff_sh16 =
-            ((cur_pitch_val - s->last_pitch_val) << 16) / MAX_FRAMESIZE;
+            (cur_pitch_val - s->last_pitch_val) * (1 << 16) / MAX_FRAMESIZE;
     }
 
     /* Global gain (if silence) and pitch-adaptive window coordinates */
@@ -1902,7 +1909,7 @@ static int wmavoice_decode_packet(AVCodecContext *ctx, void *data,
      * in a single "muxer" packet, so we artificially emulate that by
      * capping the packet size at ctx->block_align. */
     for (size = avpkt->size; size > ctx->block_align; size -= ctx->block_align);
-    init_get_bits(&s->gb, avpkt->data, size << 3);
+    init_get_bits8(&s->gb, avpkt->data, size);
 
     /* size == ctx->block_align is used to indicate whether we are dealing with
      * a new packet or a packet of which we already read the packet header
@@ -1991,7 +1998,6 @@ AVCodec ff_wmavoice_decoder = {
     .id               = AV_CODEC_ID_WMAVOICE,
     .priv_data_size   = sizeof(WMAVoiceContext),
     .init             = wmavoice_decode_init,
-    .init_static_data = wmavoice_init_static_data,
     .close            = wmavoice_decode_end,
     .decode           = wmavoice_decode_packet,
     .capabilities     = AV_CODEC_CAP_SUBFRAMES | AV_CODEC_CAP_DR1 | AV_CODEC_CAP_DELAY,
